@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Database Servers Overview</h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <select id="dbSelector" class="form-select">
+                            <option value="all">All Databases</option>
+                            {% for server in servers %}
+                            <option value="{{ server.id }}">{{ server.name }} ({{ server.db_type }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">System Metrics</h5>
+                <canvas id="systemMetricsChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">Database Performance</h5>
+                <canvas id="dbPerformanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Active Queries</h5>
+                <div class="table-responsive mt-3">
+                    <table class="table table-hover table-bordered table-striped">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 5%">No</th>
+                                <th style="width: 10%">User</th>
+                                <th style="width: 10%">IP Address</th>
+                                <th style="width: 12%">Application</th>
+                                <th style="width: 10%">Database</th>
+                                <th style="width: 8%">State</th>
+                                <th style="width: 10%">Duration</th>
+                                <th>Query</th>
+                            </tr>
+                        </thead>
+                        <tbody id="activeQueriesList">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">Loading active queries...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+<script>
+let systemMetricsChart;
+let dbPerformanceChart;
+
+function formatDuration(seconds) {
+    if (!seconds) return 'N/A';
+    if (seconds >= 3600) {
+        return Math.round(seconds/3600) + ' hours';
+    } else if (seconds >= 60) {
+        return Math.round(seconds/60) + ' minutes';
+    } else {
+        return Math.round(seconds) + ' seconds';
+    }
+}
+
+function initCharts() {
+    const systemCtx = document.getElementById('systemMetricsChart').getContext('2d');
+    systemMetricsChart = new Chart(systemCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'CPU Usage (%)',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }, {
+                label: 'Memory Usage (%)',
+                data: [],
+                borderColor: 'rgb(255, 99, 132)',
+                tension: 0.1
+            }, {
+                label: 'Disk Usage (%)',
+                data: [],
+                borderColor: 'rgb(54, 162, 235)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    const dbCtx = document.getElementById('dbPerformanceChart').getContext('2d');
+    dbPerformanceChart = new Chart(dbCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Active Connections',
+                data: [],
+                borderColor: 'rgb(153, 102, 255)',
+                tension: 0.1
+            }, {
+                label: 'Cache Hit Ratio (%)',
+                data: [],
+                borderColor: 'rgb(255, 159, 64)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function updateCharts(serverData) {
+    if (!serverData || !serverData.metrics) {
+        console.error('No metrics data available');
+        return;
+    }
+    
+    const timestamp = new Date().toLocaleTimeString();
+    const metrics = serverData.metrics;
+    
+    // Update system metrics
+    systemMetricsChart.data.labels.push(timestamp);
+    systemMetricsChart.data.datasets[0].data.push(metrics.cpu_percent || 0);
+    systemMetricsChart.data.datasets[1].data.push(metrics.memory_percent || 0);
+    systemMetricsChart.data.datasets[2].data.push(metrics.disk_usage || 0);
+    
+    // Keep only last 10 data points
+    if (systemMetricsChart.data.labels.length > 10) {
+        systemMetricsChart.data.labels.shift();
+        systemMetricsChart.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    
+    systemMetricsChart.update();
+    
+    // Update database performance metrics
+    dbPerformanceChart.data.labels.push(timestamp);
+    dbPerformanceChart.data.datasets[0].data.push(metrics.active_connections || 0);
+    dbPerformanceChart.data.datasets[1].data.push(metrics.cache_hit_ratio || metrics.buffer_pool_hit_ratio || 0);
+    
+    if (dbPerformanceChart.data.labels.length > 10) {
+        dbPerformanceChart.data.labels.shift();
+        dbPerformanceChart.data.datasets.forEach(dataset => dataset.data.shift());
+    }
+    
+    dbPerformanceChart.update();
+}
+
+function updateActiveQueries(data) {
+    const queriesList = document.getElementById('activeQueriesList');
+    let queries = [];
+    
+    // Handle the new response format
+    if (data.servers && data.servers.length > 0) {
+        // For 'all' servers view, collect queries from all servers
+        data.servers.forEach(server => {
+            if (server.queries && server.queries.length > 0) {
+                queries = queries.concat(server.queries.map(q => ({
+                    ...q,
+                    server_name: server.name,
+                    db_type: server.type
+                })));
+            }
+        });
+    }
+
+    if (!queries || queries.length === 0) {
+        queriesList.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No active queries</td></tr>';
+        return;
+    }
+
+    // Sort queries by duration (longest first)
+    queries.sort((a, b) => {
+        const durationA = a.duration_seconds || 0;
+        const durationB = b.duration_seconds || 0;
+        return durationB - durationA;
+    });
+
+    let tableHtml = '';
+    queries.forEach((query, index) => {
+        const username = query.usename || query.user || query.USER || 'N/A';
+        let ipAddress = query.ip_address || query.client_addr || query.HOST || 'N/A';
+        if (ipAddress.includes(':')) {
+            ipAddress = ipAddress.split(':')[0];
+        }
+        const appName = query.application_name || query.command || query.COMMAND || 'N/A';
+        const dbName = query.database_name || query.DB || 'N/A';
+        const state = query.state || query.STATE || 'N/A';
+        const duration = query.duration_text || formatDuration(query.duration_seconds);
+        const queryText = query.query || query.info || query.INFO || 'N/A';
+        
+        tableHtml += `
+            <tr>
+                <td class="text-center">${index + 1}</td>
+                <td><span class="badge bg-primary">${username}</span></td>
+                <td><span class="badge bg-secondary">${ipAddress}</span></td>
+                <td><span class="badge bg-info">${appName}</span></td>
+                <td><span class="badge bg-dark">${dbName}</span></td>
+                <td><span class="badge bg-secondary">${state}</span></td>
+                <td><span class="badge bg-warning text-dark">${duration}</span></td>
+                <td>
+                    <div class="query-text" style="max-width: 500px; overflow-x: auto;">
+                        <code style="white-space: pre-wrap; font-size: 0.9em;">${queryText}</code>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+    
+    queriesList.innerHTML = tableHtml;
+}
+
+function fetchMetrics() {
+    const selectedDb = document.getElementById('dbSelector').value;
+    fetch(`/api/metrics?db_id=${selectedDb}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (selectedDb === 'all') {
+                    // For 'all' view, use the first server's metrics
+                    if (data.servers && data.servers.length > 0) {
+                        const firstServer = data.servers.find(s => s.status === 'connected' && s.metrics);
+                        if (firstServer) {
+                            updateCharts(firstServer);
+                        }
+                    }
+                } else {
+                    // For single server view
+                    const server = data.servers[0];
+                    if (server && server.status === 'connected') {
+                        updateCharts(server);
+                    }
+                }
+                updateActiveQueries(data);
+            } else {
+                console.error('Error in metrics response:', data.message);
+                document.getElementById('activeQueriesList').innerHTML = 
+                    '<tr><td colspan="8" class="alert alert-danger">Error loading metrics: ' + data.message + '</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching metrics:', error);
+            document.getElementById('activeQueriesList').innerHTML = 
+                '<tr><td colspan="8" class="alert alert-danger">Error loading metrics. Please try again later.</td></tr>';
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    fetchMetrics();
+    setInterval(fetchMetrics, 5000);  // Update every 5 seconds
+    
+    document.getElementById('dbSelector').addEventListener('change', fetchMetrics);
+});
+</script>
+{% endblock %}
