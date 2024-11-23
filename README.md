@@ -28,13 +28,9 @@ A Flask-based web application for monitoring multiple database servers (PostgreS
   - View server metrics
   - Track query history
 
-## Prerequisites
+## Quick Installation
 
-- Python 3.8+
-- PostgreSQL, MySQL, or MariaDB server(s)
-- pip (Python package installer)
-
-## Installation
+### For Linux/macOS Users
 
 1. Clone the repository:
    ```bash
@@ -42,61 +38,109 @@ A Flask-based web application for monitoring multiple database servers (PostgreS
    cd dbmonitoring
    ```
 
-2. Create and activate a virtual environment:
+2. Make the installation script executable:
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   chmod +x install_unix.sh
    ```
 
-3. Install dependencies:
+3. Run the installation script:
+   ```bash
+   ./install_unix.sh
+   ```
+
+4. Start the application:
+   ```bash
+   source venv/bin/activate
+   python -m flask run
+   ```
+
+### For Windows Users
+
+1. Clone the repository:
+   ```cmd
+   git clone https://github.com/adhinugroho1711/dbmonitoring.git
+   cd dbmonitoring
+   ```
+
+2. Run the installation script:
+   ```cmd
+   install_windows.bat
+   ```
+
+3. Start the application:
+   ```cmd
+   venv\Scripts\activate
+   python -m flask run
+   ```
+
+## Manual Installation
+
+If you prefer to install manually:
+
+1. Create and activate virtual environment:
+   ```bash
+   # Linux/macOS
+   python3 -m venv venv
+   source venv/bin/activate
+
+   # Windows
+   python -m venv venv
+   venv\Scripts\activate
+   ```
+
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Create a .env file:
-   ```
-   SECRET_KEY=your-secret-key-here
-   DATABASE_URL=sqlite:///dbmonitor.db
+3. Set up environment:
+   ```bash
+   # Create instance directory
+   mkdir instance
+   
+   # Create .env file
+   echo "SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(16))')" > instance/.env
+   echo "DATABASE_URL=sqlite:///dbmonitor.db" >> instance/.env
    ```
 
-5. Initialize the database:
+4. Initialize database:
    ```bash
-   python -m flask db upgrade
+   flask db upgrade
    python create_admin.py
    ```
 
+## Default Credentials
+
+After installation, you can log in with:
+- Username: admin
+- Password: admin
+
+**Important**: Change the admin password after first login!
+
+## Prerequisites
+
+- Python 3.8 or higher
+- pip (Python package installer)
+- PostgreSQL, MySQL, or MariaDB server(s) to monitor
+
 ## Configuration
 
-1. Default admin credentials:
-   - Username: admin
-   - Password: admin
+### Database Server Configuration
 
-2. Database server configuration:
-   - Host: Your database server host
-   - Port: Database port (PostgreSQL: 5432, MySQL: 3306)
-   - Username: Database user with monitoring privileges
-   - Password: Database user password
+1. PostgreSQL:
+   - Enable `pg_stat_statements` extension
+   - Grant monitoring privileges to database user
 
-## Usage
+2. MySQL/MariaDB:
+   - Grant PROCESS, REPLICATION CLIENT privileges
+   - Enable performance schema
 
-1. Start the application:
-   ```bash
-   python -m flask run
-   ```
+### Environment Variables
 
-2. Access the web interface:
-   - URL: http://127.0.0.1:5000
-   - Log in with admin credentials
-   - Add database servers to monitor
-   - View real-time metrics and active queries
-
-## Security Considerations
-
-1. Change the default admin password after first login
-2. Use environment variables for sensitive information
-3. Regularly update dependencies
-4. Use secure database credentials with minimal required privileges
-5. Enable HTTPS in production
+Key environment variables in `instance/.env`:
+- `SECRET_KEY`: Application secret key
+- `DATABASE_URL`: SQLite database URL
+- Additional configurations can be added as needed
 
 ## Development
 
@@ -110,46 +154,42 @@ A Flask-based web application for monitoring multiple database servers (PostgreS
    pytest --cov=.
    ```
 
-## Project Structure
+## Security Considerations
 
-```
-dbmonitoring/
-├── app.py                 # Main application file
-├── db_monitor.py         # Database monitoring logic
-├── monitor_service.py    # Monitoring service
-├── templates/           # HTML templates
-│   ├── base.html
-│   ├── index.html
-│   └── ...
-├── static/             # Static files (CSS, JS)
-├── migrations/         # Database migrations
-├── tests/             # Test files
-└── requirements.txt    # Python dependencies
-```
+1. Change default admin password immediately
+2. Use secure database credentials
+3. Enable HTTPS in production
+4. Keep dependencies updated
+5. Regular security audits
+6. Proper firewall configuration
 
-## Contributing
+## Troubleshooting
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+1. Database Connection Issues:
+   - Verify database credentials
+   - Check network connectivity
+   - Ensure proper privileges
+
+2. Installation Problems:
+   - Check Python version compatibility
+   - Verify pip installation
+   - Check system permissions
+
+3. Application Errors:
+   - Check application logs
+   - Verify environment variables
+   - Ensure database migrations are up to date
+
+## Support and Contribution
+
+- Report issues on [GitHub Issues](https://github.com/adhinugroho1711/dbmonitoring/issues)
+- Submit pull requests for improvements
+- Check [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Version History
 
-- v1.0.0 (2024-11-23)
-  - Initial release
-  - Basic monitoring features
-  - Multi-database support
-  - User management
-  - Real-time metrics display
-
-## Acknowledgments
-
-- Flask and its extensions
-- Chart.js for metrics visualization
-- Bootstrap for UI components
+See [RELEASE_NOTES.md](RELEASE_NOTES.md) for detailed version history and changes.
