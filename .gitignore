@@ -37,6 +37,7 @@ env/
 .pytest_cache/
 htmlcov/
 test_reports/
+TestResults.xml
 
 # Database
 instance/
@@ -53,3 +54,13 @@ instance/
 # OS-specific
 .DS_Store
 Thumbs.db
+
+# AL specific
+.alcache/
+.alpackages/
+.snapshots/
+.output/
+*.app
+rad.json
+*.g.xlf
+*.flf
